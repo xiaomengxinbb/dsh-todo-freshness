@@ -5,6 +5,11 @@
   "description": "Says out loud when the DSH task list is a stale snapshot instead of live progress, and nudges the model to write back.",
   "license": "MIT",
   "author": "lizhi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xiaomengxinbb/dsh-todo-freshness.git"
+  },
+  "homepage": "https://github.com/xiaomengxinbb/dsh-todo-freshness#readme",
   "icon": "icon.svg",
   "keywords": [
     "dsh",
