@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Todo freshness",
+    "description": "Marks the DSH task list as a stale snapshot when it stops matching the work, and nudges the model to write it back."
+  }
+}
