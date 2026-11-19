@@ -14,7 +14,14 @@
  */
 
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
-import { anySchema, emptyState, fold, NUDGE_AT, unfinished } from './lib/fold.js'
+import {
+  anySchema,
+  createFold,
+  defaultNudgeAt,
+  emptyState,
+  STALE_CALLS,
+  unfinished,
+} from './lib/fold.js'
 
 /**
  * The reminder both thresholds send: state the drift, ask for a truthful
@@ -48,23 +55,85 @@ export const name = 'todo-freshness'
 export const inject = ['sessionProjections']
 
 /**
+ * A whole number of tool calls, or `undefined` when the value is unusable. A
+ * profile config is hand-written YAML, so a string, a fraction, or a negative
+ * number is a typo rather than an instruction; falling back to the default
+ * keeps a bad value from turning the reminder into something that fires on
+ * every single call.
+ * @param value - candidate value from the deployment config.
+ * @param min - smallest accepted value.
+ * @returns the normalized integer, or `undefined`.
+ */
+function wholeNumber(value, min) {
+  const number = typeof value === 'string' ? Number(value) : value
+  if (typeof number !== 'number' || !Number.isFinite(number)) return undefined
+  const whole = Math.floor(number)
+  return whole >= min ? whole : undefined
+}
+
+/**
+ * Read the deployment config. Every key is optional so the defaults described in
+ * the README hold when a profile says nothing.
+ * @param config - raw Cordis row config.
+ * @returns normalized settings.
+ */
+export function settings(config) {
+  const staleCalls = wholeNumber(config?.staleCalls, 1) ?? STALE_CALLS
+
+  // An explicit list wins; otherwise the schedule follows the threshold, so
+  // widening `staleCalls` does not silently leave the reminders at the old,
+  // now-unreachable counts.
+  const declared = Array.isArray(config?.nudgeAt) ? config.nudgeAt : undefined
+  const parsed = declared === undefined
+    ? undefined
+    : declared.map(value => wholeNumber(value, 1)).filter(value => value !== undefined)
+  const nudgeAt = parsed !== undefined && parsed.length > 0
+    ? [...new Set(parsed)].sort((left, right) => left - right)
+    : declared === undefined ? defaultNudgeAt(staleCalls) : []
+
+  return {
+    staleCalls,
+    nudgeAt,
+    nudge: config?.nudge !== false,
+    // Names of the config keys that were present but unusable. Reported once at
+    // activation so a typo is visible instead of silently ignored.
+    ignored: [
+      ...(config?.staleCalls !== undefined && wholeNumber(config.staleCalls, 1) === undefined ? ['staleCalls'] : []),
+      ...(declared !== undefined && nudgeAt.length === 0 ? ['nudgeAt'] : []),
+    ],
+  }
+}
+
+/**
  * Register the freshness projection and the mid-turn nudge.
  * @param ctx - registrant context carrying the projection and event registries.
- * @param config - deployment config; `nudge: false` keeps the projection and
- * drops the reminder.
+ * @param config - deployment config: `staleCalls`, `nudgeAt`, `nudge`.
  * @returns when the projection is installed.
  */
 export async function apply(ctx, config) {
+  const chosen = settings(config)
+  if (chosen.ignored.length > 0) {
+    ctx.logger?.warn?.(`${name}: ignoring ${chosen.ignored.join(', ')} (expected a whole number >= 1); `
+      + `using staleCalls=${chosen.staleCalls}${chosen.nudgeAt.length > 0 ? `, nudgeAt=${chosen.nudgeAt.join(',')}` : ''}`)
+  }
+
   const handle = await ctx.sessionProjections.register({
     key: 'todoFreshness',
     stateSchema: anySchema,
     init: () => emptyState(),
-    apply: fold,
-    wire: { viewSchema: anySchema, view: state => state, summary: false },
+    apply: createFold(chosen.staleCalls),
+    // The threshold is a deployment choice, so it rides the published view
+    // rather than the stored state: every session uses the same value, and a
+    // profile change should not require rewriting checkpoints.
+    wire: {
+      viewSchema: anySchema,
+      view: state => ({ ...state, staleCalls: chosen.staleCalls }),
+      summary: false,
+    },
     stateVersion: 1,
   })
 
-  if (config?.nudge === false) return
+  if (!chosen.nudge || chosen.nudgeAt.length === 0) return
 
   // Process-local dedup: the tool-call count already reminded at, per live
   // Agent. The projection is a pure fold and must not record that a nudge went
@@ -82,7 +151,7 @@ export async function apply(ctx, config) {
     const state = handle.stateOf(agent.session)
     if (!state.list || unfinished(state) === 0) return decision
     const at = state.callsSinceWrite
-    if (!NUDGE_AT.includes(at) || nudged.get(agent) === at) return decision
+    if (!chosen.nudgeAt.includes(at) || nudged.get(agent) === at) return decision
     nudged.set(agent, at)
     return {
       ...decision,

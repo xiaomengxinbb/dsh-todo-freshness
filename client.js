@@ -83,9 +83,13 @@ window.__ModuleLoader__.load({
       if (unfinished === 0) return null
       const closed = (freshness.closedWithUnfinished ?? 0) > 0
       if (!freshness.stale && !closed) return null
+      const threshold = freshness.staleCalls
       return h('section', {
         style: styles.root,
         'data-todo-freshness': closed ? 'closed' : 'stale',
+        // The threshold is configurable per profile, so it is worth naming on
+        // hover: the note otherwise looks arbitrary to anyone who did not pick it.
+        title: Number.isInteger(threshold) ? t('note.hint', { threshold }) : undefined,
         role: 'status',
       },
       h('div', { style: styles.body },
@@ -99,11 +103,13 @@ window.__ModuleLoader__.load({
         'note.stale': '这份清单还没跟上已经做完的工作',
         'note.closed': '这一轮已经结束，清单停在旧状态',
         'note.count': '还有 {unfinished} 项没有结论',
+        'note.hint': '清单连续 {threshold} 次工具调用没有回写',
       },
       en: {
         'note.stale': 'This list has not caught up with the work already done',
         'note.closed': 'This turn ended and the list still shows old statuses',
         'note.count': '{unfinished} without a verdict',
+        'note.hint': '{threshold} tool calls since the list was last written',
       },
     }
 

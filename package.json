@@ -1,6 +1,6 @@
 {
   "name": "dsh-todo-freshness",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "type": "module",
   "description": "Says out loud when the DSH task list is a stale snapshot instead of live progress, and nudges the model to write back.",
   "license": "MIT",
