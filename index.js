@@ -36,6 +36,17 @@ function nudgeMessage() {
   })
 }
 
+/** Cordis row name, as the bundle patch inserts it. */
+export const name = 'todo-freshness'
+
+/**
+ * Services this plugin reads. `sessionProjections` is the obvious one; the
+ * `tools/post-execute` hook lives on the root event bus and needs no service,
+ * so it is deliberately absent (declaring an unneeded service only widens the
+ * activation gate).
+ */
+export const inject = ['sessionProjections']
+
 /**
  * Register the freshness projection and the mid-turn nudge.
  * @param ctx - registrant context carrying the projection and event registries.
