@@ -74,6 +74,11 @@ window.__ModuleLoader__.load({
      * The staleness note. Renders nothing while the list still matches the work,
      * and one line when the built-in card describes a moment that has passed.
      * `todoFreshness` is this bundle's own projection; `todos` is the built-in one.
+     *
+     * The line reports what was measured — how long ago the list was written and
+     * how many edits landed since — rather than asserting that work "is done".
+     * The plugin cannot know which item finished; it can only know that the tree
+     * moved while the list stood still, and that is what it says.
      */
     function FreshnessNote({ useProjection, t }) {
       const freshness = useProjection('todoFreshness')
@@ -83,6 +88,16 @@ window.__ModuleLoader__.load({
       if (unfinished === 0) return null
       const closed = (freshness.closedWithUnfinished ?? 0) > 0
       if (!freshness.stale && !closed) return null
+      const edits = freshness.mutationsSinceWrite ?? 0
+      const written = freshness.writeTime ?? 0
+      const minutes = written > 0 ? Math.max(1, Math.round((Date.now() - written) / 60000)) : 0
+      // A quiet list is not evidence of anything, so the note only claims what
+      // the counters support; with no edits to point at it falls back to the age.
+      const text = closed
+        ? t('note.closed')
+        : edits > 0 && minutes > 0
+          ? t('note.stale', { edits, minutes })
+          : minutes > 0 ? t('note.age', { minutes }) : t('note.plain')
       const threshold = freshness.staleCalls
       return h('section', {
         style: styles.root,
@@ -94,22 +109,26 @@ window.__ModuleLoader__.load({
       },
       h('div', { style: styles.body },
         h('span', { style: styles.glyph }, h(Glyph)),
-        h('span', { style: styles.text }, closed ? t('note.closed') : t('note.stale')),
+        h('span', { style: styles.text }, text),
         h('span', { style: styles.count }, t('note.count', { unfinished }))))
     }
 
     const dictionaries = {
       zh: {
-        'note.stale': '这份清单还没跟上已经做完的工作',
+        'note.stale': '清单 {minutes} 分钟前写下，之后有 {edits} 次文件改动',
+        'note.age': '清单已经 {minutes} 分钟没有回写',
+        'note.plain': '这份清单可能已经落后于进度',
         'note.closed': '这一轮已经结束，清单停在旧状态',
         'note.count': '还有 {unfinished} 项没有结论',
-        'note.hint': '清单连续 {threshold} 次工具调用没有回写',
+        'note.hint': '连续 {threshold} 次文件改动没有回写时提示',
       },
       en: {
-        'note.stale': 'This list has not caught up with the work already done',
+        'note.stale': 'List written {minutes}m ago, {edits} file edits since',
+        'note.age': 'List not rewritten for {minutes} minutes',
+        'note.plain': 'This list may be behind the work',
         'note.closed': 'This turn ended and the list still shows old statuses',
         'note.count': '{unfinished} without a verdict',
-        'note.hint': '{threshold} tool calls since the list was last written',
+        'note.hint': 'shown after {threshold} file edits without a rewrite',
       },
     }
 

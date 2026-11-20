@@ -24,21 +24,29 @@ import {
 } from './lib/fold.js'
 
 /**
- * The reminder both thresholds send: state the drift, ask for a truthful
- * rewrite, and forbid the shortcut that would silence it.
+ * The reminder both thresholds send. It states the measured fact — how many file
+ * edits landed since the list was written — instead of claiming the list is
+ * wrong. A claim the model can check is likelier to be acted on than an
+ * assertion it may disagree with.
+ * @param calls - tool calls since the list was last written.
+ * @param edits - file edits among those calls.
  */
-const NUDGE_TEXT = 'Your todo list has not been updated for a while and no longer reflects what you have '
-  + 'done. Call `todo_write` with the COMPLETE list and the true status of every item before continuing. '
-  + 'Do not mark unfinished work `completed` just to clear the panel.'
+function nudgeText(calls, edits) {
+  return `The todo list has not been rewritten in ${calls} tool calls (${edits} of them edited files). `
+    + 'If the work has moved on, call `todo_write` with the COMPLETE list and the true status of every item. '
+    + 'Do not mark unfinished work `completed` just to clear the panel.'
+}
 
 /**
  * The advisory nudge, stamped with a producer source so history shows it as
  * injected context rather than as something the user said.
+ * @param calls - tool calls since the list was last written.
+ * @param edits - file edits among those calls.
  * @returns a frozen user message carrying one notice.
  */
-function nudgeMessage() {
+function nudgeMessage(calls, edits) {
   return createUserMessage({
-    content: [{ type: 'text', text: NUDGE_TEXT }],
+    content: [{ type: 'text', text: nudgeText(calls, edits ?? 0) }],
     source: { kind: 'todo-freshness', form: 'notice', summary: 'todo list out of date' },
   })
 }
@@ -130,14 +138,17 @@ export async function apply(ctx, config) {
       view: state => ({ ...state, staleCalls: chosen.staleCalls }),
       summary: false,
     },
-    stateVersion: 1,
+    // v2 counts edits instead of calls and carries the list's write time. An
+    // older checkpoint has neither field, and arithmetic on a missing counter
+    // yields NaN, which would silently disable the whole projection.
+    stateVersion: 2,
   })
 
   if (!chosen.nudge || chosen.nudgeAt.length === 0) return
 
-  // Process-local dedup: the tool-call count already reminded at, per live
-  // Agent. The projection is a pure fold and must not record that a nudge went
-  // out, or the note would change shape depending on who read it.
+  // Process-local dedup: the edit count already reminded at, per live Agent. The
+  // projection is a pure fold and must not record that a nudge went out, or the
+  // note would change shape depending on who read it.
   const nudged = new WeakMap()
 
   // The reminder rides the model-facing surface as injected context, which lands
@@ -155,7 +166,7 @@ export async function apply(ctx, config) {
     nudged.set(agent, at)
     return {
       ...decision,
-      additionalContexts: [...(decision.additionalContexts ?? []), nudgeMessage()],
+      additionalContexts: [...(decision.additionalContexts ?? []), nudgeMessage(at, state.mutationsSinceWrite)],
     }
   })
 }
