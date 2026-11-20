@@ -109,8 +109,7 @@ window.__ModuleLoader__.load({
       },
       h('div', { style: styles.body },
         h('span', { style: styles.glyph }, h(Glyph)),
-        h('span', { style: styles.text }, text),
-        h('span', { style: styles.count }, t('note.count', { unfinished }))))
+        h('span', { style: styles.text }, text)))
     }
 
     const dictionaries = {
@@ -119,7 +118,6 @@ window.__ModuleLoader__.load({
         'note.age': '清单已经 {minutes} 分钟没有回写',
         'note.plain': '这份清单可能已经落后于进度',
         'note.closed': '这一轮已经结束，清单停在旧状态',
-        'note.count': '还有 {unfinished} 项没有结论',
         'note.hint': '连续 {threshold} 次文件改动没有回写时提示',
       },
       en: {
@@ -127,7 +125,6 @@ window.__ModuleLoader__.load({
         'note.age': 'List not rewritten for {minutes} minutes',
         'note.plain': 'This list may be behind the work',
         'note.closed': 'This turn ended and the list still shows old statuses',
-        'note.count': '{unfinished} without a verdict',
         'note.hint': 'shown after {threshold} file edits without a rewrite',
       },
     }
