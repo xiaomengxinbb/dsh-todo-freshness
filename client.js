@@ -118,14 +118,14 @@ window.__ModuleLoader__.load({
         'note.age': '清单已经 {minutes} 分钟没有回写',
         'note.plain': '这份清单可能已经落后于进度',
         'note.closed': '这一轮已经结束，清单停在旧状态',
-        'note.hint': '连续 {threshold} 次文件改动没有回写时提示',
+        'note.hint': '连续 {threshold} 次工具调用没有回写时提示',
       },
       en: {
         'note.stale': 'List written {minutes}m ago, {edits} file edits since',
         'note.age': 'List not rewritten for {minutes} minutes',
         'note.plain': 'This list may be behind the work',
         'note.closed': 'This turn ended and the list still shows old statuses',
-        'note.hint': 'shown after {threshold} file edits without a rewrite',
+        'note.hint': 'shown after {threshold} tool calls without a rewrite',
       },
     }
 
